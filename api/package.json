@@ -1,0 +1,21 @@
+{
+  "name": "unilink-api",
+  "version": "1.0.0",
+  "description": "API própria do UNILINK — camada extra de validação para ações sensíveis (atender/encerrar chamado), usando a service_role key do Supabase apenas no servidor.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "logs": "node -e \"require('./logger'); const fs=require('fs'); const f='./logs/app.log'; console.log(fs.existsSync(f)?fs.readFileSync(f,'utf8').split('\\n').slice(-50).join('\\n'):'sem logs ainda')\"",
+    "logs:extract": "node extract-logs.js",
+    "logs:clear": "node -e \"require('fs').readdirSync('./logs').forEach(f=>{if(f.endsWith('.log')||f.endsWith('.log.1'))require('fs').unlinkSync('./logs/'+f)}); console.log('logs limpos')\""
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0"
+  }
+}

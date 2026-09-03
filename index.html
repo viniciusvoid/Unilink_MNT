@@ -1,0 +1,108 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>UNILINK - Manutenção</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
+    <!-- Biblioteca para Excel (SheetJS) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- Supabase JS (client) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        html, body {
+            background-color: #F1F5F9;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            width: 100%;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        html.dark, html.dark body { background-color: #0F172A; }
+
+        svg {
+            shape-rendering: geometricPrecision;
+            text-rendering: optimizeLegibility;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.22s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        button, input, select, textarea {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Melhorias de responsividade mobile */
+        @media (max-width: 640px) {
+            button { min-height: 44px; }
+            input, select, textarea { font-size: 16px !important; }
+        }
+        img, video { max-width: 100%; height: auto; }
+
+        /* Scrollbar sutil */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!--
+        Ordem de carregamento importa:
+        1) supabase-js (script acima) — precisa estar pronto antes do supabaseConfig.js
+        2) Config/serviços (Supabase client + camada de dados)
+        3) Funções utilitárias
+        4) Componentes reutilizáveis (badges, logo, modal)
+        5) Telas (usam os componentes acima)
+        6) App.js (usa todas as telas e monta a raiz React)
+    -->
+    <!-- Logger frontend (precisa vir ANTES do App para capturar tudo) -->
+    <script src="js/logger.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/supabaseConfig.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/services/chamadosService.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/utils.js"></script>
+
+    <script type="text/babel" charset="utf-8" src="js/components/Logo.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/components/DateBadge.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/components/ServiceBadge.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/components/PriorityBadge.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/components/ModalLogin.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/components/CameraCapture.js"></script>
+
+    <script type="text/babel" charset="utf-8" src="js/telas/TelaSucesso.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/telas/TelaMenu.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/telas/TelaCorretiva.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/telas/TelaPendencia.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/telas/TelaHistorico.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/telas/TelaDashboard.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/telas/TelaAcompanhamento.js"></script>
+    <script type="text/babel" charset="utf-8" src="js/telas/TelaRedefinirSenha.js"></script>
+
+    <script type="text/babel" charset="utf-8" src="js/App.js"></script>
+</body>
+</html>

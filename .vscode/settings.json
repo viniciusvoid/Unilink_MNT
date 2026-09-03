@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.log": "log"
+  },
+  "search.exclude": {
+    "api/logs/**": false
+  }
+}

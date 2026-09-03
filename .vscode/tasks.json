@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "UNILINK: Ver logs (app.log)",
+      "type": "shell",
+      "command": "Get-Content -Tail 100 -Wait \"${workspaceFolder}/api/logs/app.log\"",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "UNILINK: Ver logs de erro",
+      "type": "shell",
+      "command": "Get-Content -Tail 100 -Wait \"${workspaceFolder}/api/logs/error.log\"",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "UNILINK: Extrair logs",
+      "type": "shell",
+      "command": "node \"${workspaceFolder}/api/extract-logs.js\"",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "UNILINK: Limpar logs",
+      "type": "shell",
+      "command": "Remove-Item \"${workspaceFolder}/api/logs/*.log*\" -Force -ErrorAction SilentlyContinue; New-Item -ItemType File -Path \"${workspaceFolder}/api/logs/.gitkeep\" -Force | Out-Null; Write-Host 'Logs limpos.'",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": []
+    }
+  ]
+}
