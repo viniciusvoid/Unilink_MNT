@@ -177,9 +177,21 @@ const ChamadosService = {
         }
     },
 
-    // Novo fluxo: assumir
+    // Novo fluxo: assumir — AGORA PÚBLICO (sem exigir login), mantém compatibilidade se houver sessão
     async assumirChamado(chamado) {
-        await ApiClient.patch(`/chamados/${chamado.idFirebase}/assumir`, {});
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const resp = await fetch(`${API_BASE_URL}/chamados/${chamado.idFirebase}/assumir`, {
+            method: 'PATCH',
+            headers
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.mensagem || `Erro ao assumir (${resp.status})`);
+        }
+        return resp.json();
     },
     // Novo fluxo: concluir (parcial ou total) com observações
     async concluirChamado(chamado, { itensConcluidos, servicoFeito, pendencia, observacoes }) {
@@ -382,28 +394,49 @@ function formatarDataBR(isoString) {
 // CLIENTE DA API PRÓPRIA
 // ==========================================================
 const ApiClient = {
-    async _autenticado(metodo, caminho, corpo) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-
+    async _getValidToken() {
+        let { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) return session.access_token;
+        // tenta refresh silencioso se já está logado (evita pedir login desnecessário)
+        try {
+            const { data: refreshed, error } = await supabase.auth.refreshSession();
+            if (!error && refreshed?.session?.access_token) return refreshed.session.access_token;
+        } catch (_) {}
+        return null;
+    },
+    async _autenticado(metodo, caminho, corpo, tentouRefresh = false) {
+        let token = await this._getValidToken();
         if (!token) {
             throw new Error('Sessão expirada. Faça login novamente.');
         }
-
-        const resp = await fetch(`${API_BASE_URL}${caminho}`, {
-            method: metodo,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            ...(corpo ? { body: JSON.stringify(corpo) } : {})
-        });
-
+        let resp;
+        try {
+            resp = await fetch(`${API_BASE_URL}${caminho}`, {
+                method: metodo,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                ...(corpo ? { body: JSON.stringify(corpo) } : {})
+            });
+        } catch (e) {
+            console.error(`Falha de rede ao chamar API ${API_BASE_URL}${caminho}:`, e);
+            throw new Error(`Não foi possível conectar à API (${API_BASE_URL}). Verifique se o servidor está rodando (npm start em /api) e se CORS_ORIGIN inclui ${window.location.origin}.`);
+        }
         if (!resp.ok) {
             const erroBody = await resp.json().catch(() => ({}));
-            throw new Error(erroBody.mensagem || `Erro na API (${resp.status})`);
+            const msg = erroBody.mensagem || `Erro na API (${resp.status})`;
+            // se for 401 por token expirado e ainda não tentou refresh, tenta uma vez e refaz
+            if (resp.status === 401 && !tentouRefresh && msg.includes('Sessão')) {
+                try {
+                    const { data: refreshed } = await supabase.auth.refreshSession();
+                    if (refreshed?.session?.access_token) {
+                        return this._autenticado(metodo, caminho, corpo, true);
+                    }
+                } catch (_) {}
+            }
+            throw new Error(msg);
         }
-
         return resp.json();
     },
 

@@ -35,15 +35,18 @@ function App() {
     React.useEffect(() => {
         const aplicarSessao = async (session) => {
             const isAuth = !!session;
-            // evita flash onde autenticado=true mas meuPerfil ainda null (causava TypeError: null reading 'email' em App:707)
             if (isAuth) setCarregandoAuth(true);
             setAutenticado(isAuth);
             if (isAuth) {
                 try {
-                    const perfil = await ChamadosService.obterMeuPerfil();
+                    const perfil = await Promise.race([
+                        ChamadosService.obterMeuPerfil(),
+                        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout perfil')), 2500))
+                    ]);
                     if (perfil) setMeuPerfil(perfil);
                     else setMeuPerfil({ email: session?.user?.email || 'usuario', papel: 'atendente' });
-                } catch {
+                } catch (e) {
+                    console.warn('obterMeuPerfil falhou/timeout, usando fallback', e?.message);
                     setMeuPerfil({ email: session?.user?.email || 'usuario', papel: 'atendente' });
                 }
             } else {
@@ -51,19 +54,35 @@ function App() {
             }
             setCarregandoAuth(false);
         };
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            // se veio de link de recuperação (PKCE code na URL), Supabase vai trocar por sessão automaticamente
-            const hasRecovery = window.location.hash.includes('type=recovery') || window.location.search.includes('code=');
-            if (hasRecovery) setTelaAtual('redefinir');
-            aplicarSessao(session);
-        });
-        const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'PASSWORD_RECOVERY') {
-                setTelaAtual('redefinir');
+        // garante que carregandoAuth não fique preso se supabase falhar
+        const timeout = setTimeout(() => setCarregandoAuth(false), 3000);
+        try {
+            if (typeof supabase === 'undefined' || !supabase?.auth) {
+                console.error('Supabase não carregou (CDN bloqueado?)');
+                setCarregandoAuth(false);
+            } else {
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    clearTimeout(timeout);
+                    const hasRecovery = window.location.hash.includes('type=recovery') || window.location.search.includes('code=');
+                    if (hasRecovery) setTelaAtual('redefinir');
+                    aplicarSessao(session);
+                }).catch(err => {
+                    console.error('getSession falhou:', err);
+                    clearTimeout(timeout);
+                    setCarregandoAuth(false);
+                    setAutenticado(false);
+                });
+                const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+                    if (event === 'PASSWORD_RECOVERY') setTelaAtual('redefinir');
+                    await aplicarSessao(session);
+                });
+                return () => { clearTimeout(timeout); listener?.subscription?.unsubscribe(); };
             }
-            await aplicarSessao(session);
-        });
-        return () => listener?.subscription?.unsubscribe();
+        } catch (e) {
+            console.error('Erro inicial auth:', e);
+            setCarregandoAuth(false);
+        }
+        return () => clearTimeout(timeout);
     }, []);
 
     const solicitarAcessoChamados = () => {
@@ -119,10 +138,32 @@ function App() {
         setProtocoloBusca(protocolo);
         setTelaAtual('acompanhamento');
     };
+    const [chamadoPendenteAcao, setChamadoPendenteAcao] = React.useState(null);
     const assumirChamado = async (chamado) => {
-        try { await ChamadosService.assumirChamado(chamado); }
-        catch (e) { console.error("Erro ao assumir: ", e); setErroAcao(e.message || 'Não foi possível assumir.'); setTimeout(()=>setErroAcao(''), 4000); }
+        try { await ChamadosService.assumirChamado(chamado); setChamadoPendenteAcao(null); }
+        catch (e) {
+            console.error("Erro ao assumir: ", e);
+            const msg = e.message || 'Não foi possível assumir.';
+            if (msg.includes('Sessão') || msg.includes('expirada') || msg.includes('Token')) {
+                setChamadoPendenteAcao(chamado);
+                setDestinoAposLogin('pendencia');
+                setExibirLogin(true);
+                setErroAcao('Sessão expirada. Faça login para assumir e garantir a rastreabilidade.');
+            } else {
+                setErroAcao(msg);
+            }
+            setTimeout(()=>setErroAcao(''), 5000);
+            throw e;
+        }
     };
+    // após login, se havia ação pendente de assumir, tenta novamente automaticamente mantendo rastreabilidade
+    React.useEffect(() => {
+        if (autenticado && chamadoPendenteAcao && !carregandoAuth) {
+            const c = chamadoPendenteAcao;
+            setChamadoPendenteAcao(null);
+            assumirChamado(c).catch(()=>{});
+        }
+    }, [autenticado, carregandoAuth]);
     const toggleAtendimento = async (chamado) => {
         try { await ChamadosService.toggleAtendimento(chamado); }
         catch (e) {
@@ -297,9 +338,6 @@ function App() {
                 )}
 
                 {telaAtual === 'manutencao' && (
-                    carregandoAuth ? (
-                        <div className="w-full max-w-[640px] bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center text-sm font-medium text-slate-700 dark:text-slate-300">Carregando...</div>
-                    ) : (
                         <div className="w-full max-w-[640px] bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4 sm:p-5 fade-in">
                             <div className="flex items-center gap-2 mb-4">
                                 <div className="w-8 h-8 rounded-lg bg-[#0E3263] dark:bg-white text-white dark:text-slate-900 flex items-center justify-center">
@@ -321,7 +359,10 @@ function App() {
                                     <button onClick={solicitarLoginUnico} className="shrink-0 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold px-4 py-2.5 rounded-lg">Entrar</button>
                                 </div>
                             ) : !meuPerfil ? (
-                                <div className="mb-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs font-medium text-slate-700 dark:text-slate-300">Carregando perfil...</div>
+                                <div className="mb-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl p-3 flex items-center justify-between gap-2">
+                                    <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">Perfil não carregou — toque para recarregar</span>
+                                    <button onClick={() => window.location.reload()} className="text-xs font-bold bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700 px-3 py-1.5 rounded-lg">Recarregar</button>
+                                </div>
                             ) : (
                                 <div className="mb-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2">
                                     <div className="flex items-center justify-between">
@@ -365,7 +406,6 @@ function App() {
                                 </button>
                             </div>
                         </div>
-                    )
                 )}
 
                 {/* Compat: mantém 'menu' antigo redirecionando para splash para não quebrar deep links */}

@@ -78,6 +78,7 @@ async function exigirAutenticacao(req, res, next) {
 
     const { data, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !data?.user) {
+        logger.warn(`Auth falhou: ${error?.message || 'sem user'} | token=${token.slice(0,10)}... | url=${SUPABASE_URL}`);
         return res.status(401).json({ mensagem: 'Sessão inválida ou expirada. Faça login novamente.' });
     }
 
@@ -238,9 +239,17 @@ app.post('/chamados/:id/observacao', exigirAutenticacao, exigirPapelMinimo('aten
     res.json({ ok: true });
 });
 
-// Fluxo correto: ASSUMIR -> EM_ATENDIMENTO, só então conclui
-app.patch('/chamados/:id/assumir', exigirAutenticacao, exigirPapelMinimo('atendente'), async (req, res) => {
+// Fluxo correto: ASSUMIR -> EM_ATENDIMENTO, só então conclui — AGORA PÚBLICO (sem login) para agilidade, sem rastreabilidade
+app.patch('/chamados/:id/assumir', async (req, res) => {
     const { id } = req.params;
+    // tenta identificar usuário se houver token, mas não exige
+    let usuario = null;
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (token) {
+        const { data } = await supabaseAdmin.auth.getUser(token);
+        if (data?.user) usuario = data.user;
+    }
     const { data: atual, error: errGet } = await supabaseAdmin.from('chamados_unilink').select('status, atribuido_para').eq('id', id).maybeSingle();
     if (errGet || !atual) return res.status(404).json({ mensagem: 'Chamado não encontrado.' });
     if (['FECHADO','RESOLVIDO'].includes(atual.status)) return res.status(409).json({ mensagem: 'Chamado já encerrado.' });
@@ -250,13 +259,13 @@ app.patch('/chamados/:id/assumir', exigirAutenticacao, exigirPapelMinimo('atende
     }
     const { error } = await supabaseAdmin.from('chamados_unilink').update({
         status: 'EM_ATENDIMENTO',
-        atribuido_para: req.usuario.id,
-        atribuido_para_nome: req.usuario.email,
+        atribuido_para: usuario?.id || null,
+        atribuido_para_nome: usuario?.email || 'Anônimo (sem login)',
         atribuido_em: new Date().toISOString()
     }).eq('id', id);
-    if (error) { logger.error('Erro ao assumir', error); return res.status(500).json({ mensagem: 'Erro ao assumir chamado.' }); }
-    await supabaseAdmin.from('chamado_eventos').insert({ chamado_id: id, tipo_evento: 'EM_ATENDIMENTO_INICIADO', descricao: `Assumido por ${req.usuario.email}`, usuario_id: req.usuario.id, usuario_nome: req.usuario.email });
-    logger.info(`Chamado assumido`, { id, por: req.usuario.email });
+    if (error) { logger.error('Erro ao assumir (público)', error); return res.status(500).json({ mensagem: 'Erro ao assumir chamado.' }); }
+    await supabaseAdmin.from('chamado_eventos').insert({ chamado_id: id, tipo_evento: 'EM_ATENDIMENTO_INICIADO', descricao: `Assumido por ${usuario?.email || 'Anônimo (sem login)'}`, usuario_id: usuario?.id || null, usuario_nome: usuario?.email || 'Anônimo' });
+    logger.info(`Chamado assumido (público)`, { id, por: usuario?.email || 'Anônimo' });
     res.json({ ok: true, status: 'EM_ATENDIMENTO' });
 });
 

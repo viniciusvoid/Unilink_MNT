@@ -17,8 +17,11 @@ function TelaSucesso({ voltarInicio, chamado, aoAcompanhar }) {
                     {chamado?.protocolo && (
                         <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 mt-6">
                             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">Protocolo</p>
-                            <p className="text-2xl font-bold tracking-wider text-slate-900 dark:text-white">{chamado.protocolo}</p>
-
+                            <div className="flex items-center justify-center gap-2">
+                                <p className="text-2xl font-bold tracking-wider text-slate-900 dark:text-white">{chamado.protocolo}</p>
+                                <button onClick={() => { navigator.clipboard.writeText(chamado.protocolo); const b=document.getElementById('copy-protocolo'); if(b){b.textContent='Copiado!'; setTimeout(()=>b.textContent='Copiar',1500);} }} id="copy-protocolo" className="ml-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 active:scale-95">Copiar</button>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-1">Toque em Copiar para rastrear</p>
                         </div>
                     )}
 

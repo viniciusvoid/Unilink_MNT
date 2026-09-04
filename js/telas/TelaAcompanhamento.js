@@ -57,7 +57,10 @@ function TelaAcompanhamento({ protocoloInicial = '', voltar }) {
                         <div className="space-y-4">
                             <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                    <span className="font-bold text-slate-900 dark:text-white text-base sm:text-sm tracking-wide">{chamado.protocolo}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="font-bold text-slate-900 dark:text-white text-base sm:text-sm tracking-wide">{chamado.protocolo}</span>
+                                        <button onClick={() => navigator.clipboard.writeText(chamado.protocolo)} className="p-1 rounded hover:bg-white dark:hover:bg-slate-700" title="Copiar protocolo"><svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+                                    </div>
                                     <PriorityBadge prioridade={chamado.prioridade}/>
                                 </div>
                                 <h3 className="font-semibold text-slate-800 dark:text-white uppercase text-base sm:text-sm mb-2">{chamado.equipamento}</h3>
