@@ -166,8 +166,7 @@ const gerarHTMLOrdemServico = (c) => `
 const imprimirOrdemServico = (chamado) => {
     const win = window.open('', '_blank');
     if (!win) {
-        alert('Permita pop-ups para gerar o PDF da Ordem de Serviço.');
-        return;
+        window.notifyWarning && window.notifyWarning('Permita pop-ups no navegador para gerar o PDF'); return;
     }
     win.document.write(gerarHTMLOrdemServico(chamado));
     win.document.close();
@@ -180,13 +179,11 @@ const imprimirOrdemServico = (chamado) => {
 // ==========================================================
 const imprimirRelatorioLista = (lista, tituloRelatorio = 'Relatório de Chamados', filtroLabel = '') => {
     if (!lista || lista.length === 0) {
-        alert('Não há dados para gerar o PDF!');
-        return;
+        window.notifyWarning && window.notifyWarning('Nenhum dado para exportar ou gerar relatório'); return;
     }
     const win = window.open('', '_blank');
     if (!win) {
-        alert('Permita pop-ups para gerar o PDF do relatório.');
-        return;
+        window.notifyWarning && window.notifyWarning('Permita pop-ups no navegador para gerar o PDF'); return;
     }
 
     const linhas = lista.map(c => `
@@ -470,8 +467,7 @@ const calcularDistribuicaoPorUnidade = (chamados) => {
 const imprimirRelatorioMetricas = (resumo, metricasServico, periodoLabel) => {
     const win = window.open('', '_blank');
     if (!win) {
-        alert('Permita pop-ups para gerar o PDF do relatório.');
-        return;
+        window.notifyWarning && window.notifyWarning('Permita pop-ups no navegador para gerar o PDF'); return;
     }
 
     const linhasServico = metricasServico.map(m => `
@@ -560,8 +556,7 @@ const escaparXML = (valor) => String(valor ?? '-')
 
 const exportarParaXML = (dados, unidadeFiltro = 'TODOS') => {
     if (!dados || dados.length === 0) {
-        alert('Não há dados para exportar!');
-        return;
+        window.notifyWarning && window.notifyWarning('Nenhum dado para exportar ou gerar relatório'); return;
     }
 
     const sufixo = unidadeFiltro !== 'TODOS' ? `_${unidadeFiltro}` : '';
@@ -594,12 +589,12 @@ const exportarParaXML = (dados, unidadeFiltro = 'TODOS') => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    window.notifySuccess && window.notifySuccess(`XML exportado: ${dados.length} registros`);
 };
 
 const exportarParaExcel = (dados, unidadeFiltro = 'TODOS') => {
     if (!dados || dados.length === 0) {
-        alert("Não há dados para exportar!");
-        return;
+        window.notifyWarning && window.notifyWarning('Nenhum dado para exportar ou gerar relatório'); return;
     }
 
     const sufixo = unidadeFiltro !== 'TODOS' ? `_${unidadeFiltro}` : '';
@@ -626,6 +621,7 @@ const exportarParaExcel = (dados, unidadeFiltro = 'TODOS') => {
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Chamados");
             XLSX.writeFile(workbook, `Relatorio_Chamados_Unilink${sufixo}.xlsx`);
+            window.notifySuccess && window.notifySuccess(`Excel exportado: ${dados.length} registros`);
         } else {
             exportarCSVFallback(dados, sufixo);
         }

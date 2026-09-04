@@ -19,10 +19,13 @@ function ModalLogin({ aoAutenticar, fechar }) {
             const emailLogin = usuario.includes('@') ? usuario : `${usuario}@unilink.local`;
             const { error } = await supabase.auth.signInWithPassword({ email: emailLogin, password: senha });
             if (error) throw error;
+            window.notifySuccess && window.notifySuccess('Login realizado com sucesso!');
             aoAutenticar();
         } catch (err) {
             console.error('Erro de autenticação:', err.message);
-            setErro('Usuário ou senha incorretos.');
+            const msg = 'Usuário ou senha incorretos.';
+            setErro(msg);
+            window.notifyError && window.notifyError(msg);
         } finally {
             setCarregando(false);
         }
@@ -32,16 +35,20 @@ function ModalLogin({ aoAutenticar, fechar }) {
         e.preventDefault();
         setErro(''); setMsgRecuperar('');
         const email = emailRecuperar.includes('@') ? emailRecuperar : `${emailRecuperar}@unilink.local`;
-        if (!email || !email.includes('@')) { setErro('Informe um e-mail válido.'); return; }
+        if (!email || !email.includes('@')) { const m='Informe um e-mail válido.'; setErro(m); window.notifyWarning && window.notifyWarning(m); return; }
         setCarregandoRecuperar(true);
         try {
             const redirectTo = window.location.origin + window.location.pathname;
             const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
             if (error) throw error;
-            setMsgRecuperar('Se o e-mail existir, você receberá um link para redefinir a senha. Verifique a caixa de entrada e spam.');
+            const msg='Se o e-mail existir, você receberá um link para redefinir a senha. Verifique a caixa de entrada e spam.';
+            setMsgRecuperar(msg);
+            window.notifySuccess && window.notifySuccess('Link de recuperação enviado! Verifique seu e-mail.');
         } catch (err) {
             console.error('Erro recuperação:', err.message);
-            setErro(err.message || 'Não foi possível enviar o e-mail.');
+            const m = err.message || 'Não foi possível enviar o e-mail.';
+            setErro(m);
+            window.notifyError && window.notifyError(m);
         } finally { setCarregandoRecuperar(false); }
     };
 

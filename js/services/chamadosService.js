@@ -84,6 +84,8 @@ const ChamadosService = {
 
         if (error) {
             console.error('Erro ao listar chamados:', error);
+            window.notifyError && window.notifyError('Falha ao carregar chamados. Verifique a conexão.');
+            if (window.UnilinkLogger) window.UnilinkLogger.error('listarChamados', error);
             return [];
         }
 
@@ -113,13 +115,17 @@ const ChamadosService = {
 
         if (error) {
             console.error('Erro ao criar chamado:', error);
+            let msg = 'Não foi possível abrir o chamado.';
+            if (error.message?.includes('duplicate')) msg = 'Protocolo duplicado, tente novamente';
+            else if (error.code === 'PGRST301') msg = 'Erro de permissão ao criar chamado';
+            window.notifyError && window.notifyError(msg);
             throw error;
         }
 
         const chamado = this._mapearChamado(data);
 
         // Evento de abertura na timeline (insert público, RLS permite).
-        await this.registrarEvento(chamado.idFirebase, 'ABERTURA', 'Chamado aberto pelo solicitante.');
+        try { await this.registrarEvento(chamado.idFirebase, 'ABERTURA', 'Chamado aberto pelo solicitante.'); } catch(_){}
 
         return chamado;
     },
@@ -138,8 +144,10 @@ const ChamadosService = {
 
         if (error) {
             console.error('Erro ao buscar chamado por protocolo:', error);
+            window.notifyError && window.notifyError('Erro ao buscar protocolo. Tente novamente.');
             throw error;
         }
+        if (!data) window.notifyWarning && window.notifyWarning('Protocolo não encontrado');
         return data ? this._mapearChamado(data) : null;
     },
 
@@ -271,14 +279,19 @@ const ChamadosService = {
     /** Valida extensão, MIME e tamanho antes de tentar o upload. */
     _validarArquivoEvidencia(file) {
         const extensao = (file.name.split('.').pop() || '').toLowerCase();
-
         if (!EXTENSOES_PERMITIDAS.includes(extensao)) {
-            throw new Error(`Formato ".${extensao}" não permitido. Use JPG, PNG ou WEBP.`);
+            const msg = `Formato ".${extensao}" não permitido. Use JPG, PNG ou WEBP.`;
+            window.notifyWarning && window.notifyWarning(msg);
+            throw new Error(msg);
         }
         if (!TIPOS_MIME_PERMITIDOS.includes(file.type)) {
-            throw new Error('Arquivo inválido: apenas imagens JPG, PNG ou WEBP são aceitas.');
+            const msg = 'Arquivo inválido: apenas JPG, PNG ou WEBP são aceitos.';
+            window.notifyWarning && window.notifyWarning(msg);
+            throw new Error(msg);
         }
         if (file.size > TAMANHO_MAX_BYTES) {
+            const msg = `Arquivo "${file.name}" excede 8MB e foi ignorado.`;
+            window.notifyWarning && window.notifyWarning(msg);
             throw new Error('Arquivo muito grande: o limite é 8MB por foto.');
         }
     },
@@ -301,7 +314,9 @@ const ChamadosService = {
 
         if (erroUpload) {
             console.error('Erro ao enviar evidência para o Storage:', erroUpload);
-            throw new Error('Não foi possível enviar a foto. Tente novamente.');
+            const msg = erroUpload.message?.includes('exceeded') ? 'Foto excede limite do Storage' : 'Não foi possível enviar a foto. Verifique a conexão.';
+            window.notifyError && window.notifyError(msg);
+            throw new Error(msg);
         }
 
         const { data: sessionData } = await supabase.auth.getSession();

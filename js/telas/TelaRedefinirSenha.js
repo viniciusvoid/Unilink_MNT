@@ -11,17 +11,21 @@ function TelaRedefinirSenha({ voltar, aoSucesso }) {
     const handleRedefinir = async (e) => {
         e.preventDefault();
         setErro(''); setOk('');
-        if (novaSenha.length < 6) { setErro('A senha deve ter pelo menos 6 caracteres.'); return; }
-        if (novaSenha !== confirmar) { setErro('As senhas não conferem.'); return; }
+        if (novaSenha.length < 6) { const m='A senha deve ter pelo menos 6 caracteres.'; setErro(m); window.notifyWarning && window.notifyWarning(m); return; }
+        if (novaSenha !== confirmar) { const m='As senhas não conferem.'; setErro(m); window.notifyWarning && window.notifyWarning(m); return; }
         setCarregando(true);
         try {
             const { error } = await supabase.auth.updateUser({ password: novaSenha });
             if (error) throw error;
-            setOk('Senha redefinida com sucesso! Você já pode fazer login com a nova senha.');
-            setTimeout(() => aoSucesso && aoSucesso(), 2000);
+            const msg='Senha redefinida com sucesso! Faça login com a nova senha.';
+            setOk(msg);
+            window.notifySuccess && window.notifySuccess(msg);
+            setTimeout(() => aoSucesso && aoSucesso(), 1800);
         } catch (err) {
             console.error('Erro redefinir:', err.message);
-            setErro(err.message || 'Não foi possível redefinir. O link pode ter expirado.');
+            const m = err.message || 'Não foi possível redefinir. O link pode ter expirado.';
+            setErro(m);
+            window.notifyError && window.notifyError(m);
         } finally { setCarregando(false); }
     };
 

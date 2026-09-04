@@ -109,6 +109,7 @@ function App() {
     const handleSair = async () => {
         await ChamadosService.logout();
         setTelaAtual('splash');
+        window.notifyInfo && window.notifyInfo('Você saiu do sistema');
     };
     const handleLoginSucesso = () => {
         setExibirLogin(false);

@@ -10,21 +10,38 @@ function TelaCorretiva({ aoSalvar, voltar }) {
     const TAMANHO_MAX_MB = 8;
     const handleSelecionarFotos = (files) => {
         const arquivos = Array.from(files || []); setErroFoto(''); const validos = [];
+        let houveErro = false;
         for (const arq of arquivos) {
             const ext = (arq.name.split('.').pop() || '').toLowerCase();
-            if (!EXTENSOES_ACEITAS.includes(ext)) { setErroFoto(`"${arq.name}" formato não permitido. Use JPG, PNG ou WEBP.`); continue; }
-            if (arq.size > TAMANHO_MAX_MB * 1024 * 1024) { setErroFoto(`"${arq.name}" excede ${TAMANHO_MAX_MB}MB.`); continue; }
+            if (!EXTENSOES_ACEITAS.includes(ext)) { setErroFoto(`"${arq.name}" formato não permitido. Use JPG, PNG ou WEBP.`); window.notifyWarning && window.notifyWarning(`Arquivo "${arq.name}" ignorado: formato inválido`); houveErro = true; continue; }
+            if (arq.size > TAMANHO_MAX_MB * 1024 * 1024) { setErroFoto(`"${arq.name}" excede ${TAMANHO_MAX_MB}MB.`); window.notifyWarning && window.notifyWarning(`"${arq.name}" excede ${TAMANHO_MAX_MB}MB e foi ignorado`); houveErro = true; continue; }
             validos.push(arq);
         }
+        if (validos.length > 0) window.notifySuccess && window.notifySuccess(`${validos.length} foto(s) adicionada(s)`);
+        else if (houveErro) window.notifyError && window.notifyError('Nenhuma foto válida adicionada');
+        if (fotos.length + validos.length > 5) window.notifyWarning && window.notifyWarning('Limite de 5 fotos atingido — excedentes ignorados');
         setFotos(prev => [...prev, ...validos].slice(0, 5));
     };
     const handleCaptureFoto = (file) => handleSelecionarFotos([file]);
-    const removerFoto = (idx) => setFotos(prev => prev.filter((_, i) => i !== idx));
-    const toggleServico = (srv) => setForm(prev => { const jaExiste = prev.servico.includes(srv); return { ...prev, servico: jaExiste ? prev.servico.filter(s => s !== srv) : [...prev.servico, srv] }; });
+    const removerFoto = (idx) => { setFotos(prev => prev.filter((_, i) => i !== idx)); window.notifyInfo && window.notifyInfo('Foto removida'); };
+    const toggleServico = (srv) => {
+        setForm(prev => {
+            const jaExiste = prev.servico.includes(srv);
+            const novo = jaExiste ? prev.servico.filter(s => s !== srv) : [...prev.servico, srv];
+            if (!jaExiste) window.notifyInfo && window.notifyInfo(`${srv} adicionado`);
+            return { ...prev, servico: novo };
+        });
+    };
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!form.equipamento || form.servico.length === 0 || !form.descricao || !form.localizacao) { alert("Preencha todos os campos e selecione ao menos um serviço!"); return; }
-        setEnviando(true); try { await aoSalvar({ ...form, servico: form.servico.join(', '), fotos }); } finally { setEnviando(false); }
+        if (!form.equipamento) { window.notifyWarning && window.notifyWarning('Informe o equipamento'); return; }
+        if (form.servico.length === 0) { window.notifyWarning && window.notifyWarning('Selecione ao menos um serviço'); return; }
+        if (!form.descricao.trim()) { window.notifyWarning && window.notifyWarning('Descreva o problema'); return; }
+        if (!form.localizacao.trim()) { window.notifyWarning && window.notifyWarning('Informe a localização'); return; }
+        setEnviando(true);
+        try { await aoSalvar({ ...form, servico: form.servico.join(', '), fotos }); }
+        catch (err) { window.notifyError && window.notifyError(err.message || 'Falha ao abrir chamado'); }
+        finally { setEnviando(false); }
     };
     return (
         <div className="w-full flex justify-center fade-in px-3 sm:px-4">

@@ -10,15 +10,22 @@ function TelaAcompanhamento({ protocoloInicial = '', voltar }) {
     const [evidencias, setEvidencias] = React.useState([]);
     const [imagemAmpliada, setImagemAmpliada] = React.useState(null);
     const buscarChamado = React.useCallback(async (protocoloBusca) => {
-        if (!protocoloBusca || !protocoloBusca.trim()) return;
+        if (!protocoloBusca || !protocoloBusca.trim()) { window.notifyWarning && window.notifyWarning('Informe o protocolo'); return; }
         setCarregando(true); setErro(''); setChamado(null); setEventos([]); setEvidencias([]);
         try {
             const encontrado = await ChamadosService.buscarPorProtocolo(protocoloBusca);
-            if (!encontrado) { setErro('Nenhum chamado encontrado com este protocolo.'); return; }
+            if (!encontrado) { setErro('Nenhum chamado encontrado com este protocolo.'); window.notifyWarning && window.notifyWarning('Protocolo não encontrado'); return; }
             setChamado(encontrado);
+            window.notifySuccess && window.notifySuccess('Chamado encontrado!');
             const [ev, fotos] = await Promise.all([ChamadosService.listarEventos(encontrado.idFirebase), ChamadosService.listarEvidencias(encontrado.idFirebase)]);
             setEventos(ev); setEvidencias(fotos);
-        } catch (e) { console.error(e); setErro('Não foi possível buscar o chamado agora.'); }
+        } catch (e) {
+            console.error(e);
+            const msg = 'Não foi possível buscar o chamado. Verifique o protocolo e a conexão.';
+            setErro(msg);
+            window.notifyError && window.notifyError(msg);
+            if (window.UnilinkLogger) window.UnilinkLogger.error('buscarChamado', e);
+        }
         finally { setCarregando(false); }
     }, []);
     React.useEffect(()=>{ if(protocoloInicial) buscarChamado(protocoloInicial); },[protocoloInicial, buscarChamado]);
@@ -59,7 +66,7 @@ function TelaAcompanhamento({ protocoloInicial = '', voltar }) {
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-1.5">
                                         <span className="font-bold text-slate-900 dark:text-white text-base sm:text-sm tracking-wide">{chamado.protocolo}</span>
-                                        <button onClick={() => navigator.clipboard.writeText(chamado.protocolo)} className="p-1 rounded hover:bg-white dark:hover:bg-slate-700" title="Copiar protocolo"><svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+                                        <button onClick={() => navigator.clipboard.writeText(chamado.protocolo).then(()=>window.notifySuccess && window.notifySuccess('Protocolo '+chamado.protocolo+' copiado!'))} className="p-1 rounded hover:bg-white dark:hover:bg-slate-700" title="Copiar protocolo"><svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
                                     </div>
                                     <PriorityBadge prioridade={chamado.prioridade}/>
                                 </div>

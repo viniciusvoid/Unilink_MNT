@@ -108,7 +108,10 @@ function TelaPendencia({ chamados, voltar, encerrar, assumir, concluir }) {
 
             }
 
-        } catch(e){ alert(e.message); }
+        } catch(e){
+            window.notifyError && window.notifyError(e.message || 'Falha ao assumir');
+            if (window.UnilinkLogger) window.UnilinkLogger.error('handleAssumir', e);
+        }
 
         finally { setAssumindoId(null); }
 
@@ -120,8 +123,7 @@ function TelaPendencia({ chamados, voltar, encerrar, assumir, concluir }) {
 
         if (!emAtendimento(chamado) && !aguardando(chamado)) {
 
-            alert('Você precisa ASSUMIR o chamado primeiro. Clique em "Assumir" para levar para Em Atendimento.');
-
+            window.notifyWarning && window.notifyWarning('Assuma o chamado primeiro para concluir');
             return;
 
         }
@@ -151,34 +153,24 @@ function TelaPendencia({ chamados, voltar, encerrar, assumir, concluir }) {
     };
 
     const handleSelecionarFotoResolucao = (files) => {
-
         const arquivos = Array.from(files || []); setErroFotoResolucao(''); const validos = [];
-
+        let houveErro = false;
         for (const arq of arquivos) {
-
             const ext = (arq.name.split('.').pop() || '').toLowerCase();
-
-            if (!['jpg','jpeg','png','webp'].includes(ext)) { setErroFotoResolucao(`"${arq.name}" formato não permitido.`); continue; }
-
-            if (arq.size > 8*1024*1024) { setErroFotoResolucao(`"${arq.name}" excede 8MB.`); continue; }
-
+            if (!['jpg','jpeg','png','webp'].includes(ext)) { setErroFotoResolucao(`"${arq.name}" formato não permitido.`); window.notifyWarning && window.notifyWarning(`"${arq.name}" ignorado: formato inválido`); houveErro = true; continue; }
+            if (arq.size > 8*1024*1024) { setErroFotoResolucao(`"${arq.name}" excede 8MB.`); window.notifyWarning && window.notifyWarning(`"${arq.name}" excede 8MB`); houveErro = true; continue; }
             validos.push(arq);
-
         }
-
+        if (validos.length) window.notifySuccess && window.notifySuccess(`${validos.length} foto(s) adicionada(s)`);
+        else if (houveErro) window.notifyError && window.notifyError('Nenhuma foto válida');
+        if (fotosResolucao.length + validos.length > 5) window.notifyWarning && window.notifyWarning('Limite de 5 fotos — excedentes ignorados');
         setFotosResolucao(prev => [...prev, ...validos].slice(0,5));
-
     };
-
     const handleCaptureResolucao = (file) => handleSelecionarFotoResolucao([file]);
-
     const handleConfirmarFinalizacao = async (e) => {
-
         e.preventDefault(); if (!chamadoEmEncerramento) return;
-
-        if (itensSelecionados.length === 0) { alert('Selecione ao menos um item concluído.'); return; }
-
-        if (!servicoFeito.trim()) { alert('Descreva o serviço executado.'); return; }
+        if (itensSelecionados.length === 0) { window.notifyWarning && window.notifyWarning('Selecione ao menos um item concluído'); return; }
+        if (!servicoFeito.trim()) { window.notifyWarning && window.notifyWarning('Descreva o serviço executado'); return; }
 
         setEnviandoFinalizacao(true);
 
@@ -216,11 +208,16 @@ function TelaPendencia({ chamados, voltar, encerrar, assumir, concluir }) {
 
             }
 
-            for (const foto of fotosResolucao) { try { await ChamadosService.uploadEvidencia(chamadoEmEncerramento.idFirebase, foto, 'RESOLUCAO'); } catch(e){ console.error(e); } }
-
+            for (const foto of fotosResolucao) {
+                try { await ChamadosService.uploadEvidencia(chamadoEmEncerramento.idFirebase, foto, 'RESOLUCAO'); }
+                catch(e){ console.error(e); window.notifyWarning && window.notifyWarning('Foto não enviada: '+e.message); }
+            }
             setChamadoEmEncerramento(null); setFotosResolucao([]);
-
-        } catch(err){ alert(err.message); }
+            window.notifySuccess && window.notifySuccess('Chamado atualizado com sucesso!');
+        } catch(err){
+            window.notifyError && window.notifyError(err.message || 'Falha ao concluir');
+            if (window.UnilinkLogger) window.UnilinkLogger.error('handleConfirmarFinalizacao', err);
+        }
 
         finally { setEnviandoFinalizacao(false); }
 
@@ -546,7 +543,7 @@ function TelaPendencia({ chamados, voltar, encerrar, assumir, concluir }) {
 
                                 </div>
 
-                                <div className="flex items-center gap-1 mb-1"><p className="text-[11px] font-mono text-slate-600 dark:text-slate-400">{c.protocolo} • {c.status}</p><button onClick={() => { navigator.clipboard.writeText(c.protocolo); }} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Copiar protocolo"><svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button></div>
+                                <div className="flex items-center gap-1 mb-1"><p className="text-[11px] font-mono text-slate-600 dark:text-slate-400">{c.protocolo} • {c.status}</p><button onClick={() => { navigator.clipboard.writeText(c.protocolo).then(()=>window.notifySuccess && window.notifySuccess('Protocolo '+c.protocolo+' copiado!'))(()=>window.notifySuccess && window.notifySuccess('Protocolo '+c.protocolo+' copiado!')); }} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Copiar protocolo"><svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button></div>
 
                                 {c.atribuidoParaNome && <p className="text-[11px] text-amber-700 dark:text-amber-300 mb-2">• {c.atribuidoParaNome} {emAtendimento(c)?'em atendimento':''}</p>}
 
@@ -634,7 +631,7 @@ function TelaPendencia({ chamados, voltar, encerrar, assumir, concluir }) {
 
                                         <td className="p-3 text-center"><DateBadge dataStr={c.dataAbertura}/></td>
 
-                                        <td className="p-3 font-medium text-slate-900 dark:text-white">{c.equipamento}<div className="flex items-center gap-1"><div className="text-[11px] font-mono text-slate-600 dark:text-slate-400">{c.protocolo}</div><button onClick={() => navigator.clipboard.writeText(c.protocolo)} className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Copiar protocolo"><svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button></div><div className="text-[11px] text-slate-700 dark:text-slate-300">{c.servico}</div></td>
+                                        <td className="p-3 font-medium text-slate-900 dark:text-white">{c.equipamento}<div className="flex items-center gap-1"><div className="text-[11px] font-mono text-slate-600 dark:text-slate-400">{c.protocolo}</div><button onClick={() => navigator.clipboard.writeText(c.protocolo).then(()=>window.notifySuccess && window.notifySuccess('Protocolo '+c.protocolo+' copiado!'))} className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Copiar protocolo"><svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button></div><div className="text-[11px] text-slate-700 dark:text-slate-300">{c.servico}</div></td>
 
                                         <td className="p-3 text-center"><ServiceBadge servico={c.servico}/>{c.itensConcluidos?.length?<div className="text-[10px] text-emerald-600">{c.itensConcluidos.join(', ')}</div>:null}</td>
 
