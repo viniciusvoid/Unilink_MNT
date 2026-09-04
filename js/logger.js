@@ -7,7 +7,10 @@
 (function () {
     const STORAGE_KEY = 'unilink_logs';
     const MAX_ENTRIES = 500;
-    const API_URL = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:3001') + '/logs/frontend';
+    function getApiUrl() {
+        const base = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : (window.API_BASE_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3001' : 'https://unilinkmnt-production.up.railway.app')));
+        return base + '/logs/frontend';
+    }
 
     function now() { return new Date().toISOString(); }
 
@@ -26,7 +29,7 @@
         // tenta enviar ao backend (best-effort, sem bloquear)
         try {
             if (navigator.onLine) {
-                fetch(API_URL, {
+                fetch(getApiUrl(), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ level, message, meta: entry })
