@@ -14,10 +14,12 @@
 
 const SUPABASE_URL = "https://lylnrlybiyfoogfsnctz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5bG5ybHliaXlmb29nZnNuY3R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1ODc5NjgsImV4cCI6MjEwMzE2Mzk2OH0.5BeBVkVlzLOtO7As-adNA2vvbrxedX7CUqyRBvcMZVI";
-const SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5bG5ybHliaXlmb29nZnNuY3R6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzU4Nzk2OCwiZXhwIjoyMTAzMTYzOTY4fQ.OeGVG07uGg4V_9VKyr8pEat7C2umnVD_vE7Ync2d2BA";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Base da API própria (camada extra para ações sensíveis).
-// Em desenvolvimento local costuma ser http://localhost:3001
-// Em produção, aponte para onde você hospedar a pasta /api.
-const API_BASE_URL = "http://localhost:3001";
+// Base da API — dinâmica: localhost usa :3001, produção usa Railway
+// Defina window.API_BASE_URL no HTML ou via env do Railway para sobrepor
+const API_BASE_URL = window.API_BASE_URL || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3001'
+    : 'https://unilinkmnt-production.up.railway.app'
+);

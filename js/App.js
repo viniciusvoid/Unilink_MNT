@@ -122,14 +122,17 @@ function App() {
             if (fotos && fotos.length > 0) {
                 for (const foto of fotos) {
                     try { await ChamadosService.uploadEvidencia(criado.idFirebase, foto, 'ABERTURA'); }
-                    catch (erroFoto) { console.error('Erro ao enviar evidência da abertura:', erroFoto); }
+                    catch (erroFoto) { console.error('Erro ao enviar evidência da abertura:', erroFoto); window.notifyWarning && window.notifyWarning('Chamado aberto, mas falha ao enviar foto: '+erroFoto.message); }
                 }
             }
             setChamadoRecemCriado(criado);
             setTelaAtual('sucesso');
+            window.notifySuccess && window.notifySuccess('Chamado aberto! Protocolo: ' + criado.protocolo);
         } catch (e) {
             console.error("Erro ao adicionar chamado: ", e);
-            setErroAcao('Não foi possível abrir o chamado. Verifique sua conexão e tente novamente.');
+            const msg = 'Não foi possível abrir o chamado. Verifique sua conexão e tente novamente.';
+            setErroAcao(msg);
+            window.notifyError && window.notifyError(msg + ' ('+e.message+')');
             setTimeout(() => setErroAcao(''), 4000);
         }
     };
@@ -140,15 +143,25 @@ function App() {
     };
     const [chamadoPendenteAcao, setChamadoPendenteAcao] = React.useState(null);
     const assumirChamado = async (chamado) => {
-        try { await ChamadosService.assumirChamado(chamado); setChamadoPendenteAcao(null); }
+        try {
+            await ChamadosService.assumirChamado(chamado);
+            setChamadoPendenteAcao(null);
+            window.notifySuccess && window.notifySuccess('Chamado assumido! Status: Em atendimento');
+        }
         catch (e) {
             console.error("Erro ao assumir: ", e);
             const msg = e.message || 'Não foi possível assumir.';
-            if (msg.includes('Sessão') || msg.includes('expirada') || msg.includes('Token')) {
+            window.notifyError && window.notifyError(msg);
+            if (msg.includes('Sessão') || msg.includes('expirada') || msg.includes('Token') || msg.includes('conectar à API')) {
                 setChamadoPendenteAcao(chamado);
-                setDestinoAposLogin('pendencia');
-                setExibirLogin(true);
-                setErroAcao('Sessão expirada. Faça login para assumir e garantir a rastreabilidade.');
+                // se for erro de API (deploy), não abre login, só mostra erro
+                if (msg.includes('conectar à API')) {
+                    setErroAcao(msg);
+                } else {
+                    setDestinoAposLogin('pendencia');
+                    setExibirLogin(true);
+                    setErroAcao('Sessão expirada. Faça login para assumir.');
+                }
             } else {
                 setErroAcao(msg);
             }
@@ -183,12 +196,14 @@ function App() {
     };
     const concluirChamado = async (chamado, dados) => {
         try {
-            // dados: { itensConcluidos, servicoFeito, pendencia, observacoes }
-            await ChamadosService.concluirChamado(chamado, dados);
-            // upload de fotos é feito dentro da TelaPendencia após a chamada
+            const res = await ChamadosService.concluirChamado(chamado, dados);
+            window.notifySuccess && window.notifySuccess(res?.tipo === 'parcial' ? 'Conclusão parcial registrada!' : 'Chamado concluído com sucesso!');
+            return res;
         } catch (e) {
             console.error("Erro ao concluir: ", e);
-            setErroAcao(e.message || 'Não foi possível concluir.');
+            const msg = e.message || 'Não foi possível concluir.';
+            setErroAcao(msg);
+            window.notifyError && window.notifyError(msg);
             setTimeout(()=>setErroAcao(''), 4000);
             throw e;
         }
@@ -231,6 +246,7 @@ function App() {
 
     return (
         <div className="min-h-screen flex flex-col antialiased overflow-x-hidden selection:bg-[#0E3263]/10 bg-[#F1F5F9] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+            <ToastContainer />
             {exibirLogin && (
                 <ModalLogin
                     aoAutenticar={handleLoginSucesso}
