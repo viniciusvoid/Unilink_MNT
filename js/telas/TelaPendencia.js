@@ -80,7 +80,7 @@ function TelaPendencia({ chamados, voltar, encerrar, assumir, concluir }) {
 
     const getItens = (ch) => String(ch.servico||'').split(',').map(s=>s.trim()).filter(Boolean);
 
-    const podeAssumir = (c) => ['ABERTO','EM_ANALISE','ATRIBUIDO'].includes(c.status) && !c.emAtendimento;
+    const podeAssumir = (c) => ['ABERTO','EM_ANALISE','ATRIBUIDO','AGUARDANDO_USUARIO'].includes(c.status) && !c.emAtendimento;
 
     const emAtendimento = (c) => c.status === 'EM_ATENDIMENTO' || c.emAtendimento;
 
@@ -90,6 +90,12 @@ function TelaPendencia({ chamados, voltar, encerrar, assumir, concluir }) {
 
     const handleAssumir = async (chamado) => {
 
+        console.log('Assumir chamado:', chamado.idFirebase, chamado.protocolo, chamado.status);
+        if (!chamado.idFirebase || chamado.idFirebase.length < 10) {
+            console.error('idFirebase inválido:', chamado);
+            window.notifyError && window.notifyError('ID do chamado inválido. Recarregue a página.');
+            return;
+        }
         setAssumindoId(chamado.idFirebase);
 
         try {

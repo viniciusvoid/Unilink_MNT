@@ -251,7 +251,10 @@ app.patch('/chamados/:id/assumir', async (req, res) => {
         if (data?.user) usuario = data.user;
     }
     const { data: atual, error: errGet } = await supabaseAdmin.from('chamados_unilink').select('status, atribuido_para').eq('id', id).maybeSingle();
-    if (errGet || !atual) return res.status(404).json({ mensagem: 'Chamado não encontrado.' });
+    if (errGet || !atual) {
+        logger.warn(`Assumir 404: id=${id} err=${errGet?.message || 'not found'} url=${SUPABASE_URL}`);
+        return res.status(404).json({ mensagem: 'Chamado não encontrado.' });
+    }
     if (['FECHADO','RESOLVIDO'].includes(atual.status)) return res.status(409).json({ mensagem: 'Chamado já encerrado.' });
     if (atual.status === 'EM_ATENDIMENTO') return res.json({ ok: true, status: 'EM_ATENDIMENTO', jaAssumido: true });
     if (!podeTransitar(atual.status, 'EM_ATENDIMENTO')) {
