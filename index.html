@@ -81,6 +81,14 @@
         5) Telas (usam os componentes acima)
         6) App.js (usa todas as telas e monta a raiz React)
     -->
+    <!-- Configuração de ambiente (permite sobrepor API_BASE_URL via Railway) -->
+    <script>
+      // Defina aqui a URL da API em produção. Railway injeta via window.API_BASE_URL se existir.
+      // Se a API estiver no mesmo host do front, deixe null e o supabaseConfig.js usará o fallback.
+      window.API_BASE_URL = window.API_BASE_URL || null;
+      // Exemplo para seu projeto: descomente e ajuste se a API for outro serviço Railway
+      // window.API_BASE_URL = "https://unilink-api-production.up.railway.app";
+    </script>
     <!-- Logger frontend (precisa vir ANTES do App para capturar tudo) -->
     <script src="js/logger.js"></script>
     <script type="text/babel" charset="utf-8" src="js/supabaseConfig.js"></script>

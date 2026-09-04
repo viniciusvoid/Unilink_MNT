@@ -389,6 +389,11 @@ const ChamadosService = {
         try {
             return await ApiClient.get('/meu-perfil');
         } catch (e) {
+            // 404 aqui é esperado quando API_BASE_URL aponta para o front (Caddy) e não para a API — usa fallback silencioso
+            if (e.message.includes('(404)') || e.message.includes('API não encontrada')) {
+                console.warn('obterMeuPerfil 404 — API_BASE_URL provavelmente aponta para o front, não para a API. Usando fallback session.user');
+                return null;
+            }
             console.error('Erro ao obter perfil do usuário:', e);
             return null;
         }
