@@ -21,21 +21,33 @@
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(-MAX_ENTRIES))); } catch (_) {}
     }
 
+    let isPersisting = false;
     function persist(level, message, meta) {
-        const entry = { ts: now(), level, message, meta: meta || null, url: location.href, ua: navigator.userAgent };
-        const entries = load();
-        entries.push(entry);
-        save(entries);
-        // tenta enviar ao backend (best-effort, sem bloquear)
+        if (isPersisting) return;
+        isPersisting = true;
         try {
-            if (navigator.onLine) {
-                fetch(getApiUrl(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ level, message, meta: entry })
-                }).catch(() => {});
-            }
-        } catch (_) {}
+            const entry = { ts: now(), level, message, meta: meta || null, url: location.href, ua: navigator.userAgent };
+            const entries = load();
+            entries.push(entry);
+            save(entries);
+            // tenta enviar ao backend (best-effort, sem bloquear, sem recursão)
+            try {
+                if (navigator.onLine) {
+                    // usa fetch nativo sem passar pelo logger
+                    const url = getApiUrl();
+                    // não loga falha de /logs/frontend para evitar cascata
+                    if (url.includes('/logs/frontend')) {
+                        fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ level, message, meta: entry })
+                        }).catch(() => {});
+                    }
+                }
+            } catch (_) {}
+        } finally {
+            isPersisting = false;
+        }
     }
 
     function fmt(args) {
@@ -82,10 +94,12 @@
         persist('error', `unhandledrejection: ${reason}`, { type: 'unhandledrejection' });
     });
 
-    // Intercepta console.error para persistir também
+    // Intercepta console.error para persistir também (com guard para não recursar)
     const origError = console.error;
     console.error = function (...args) {
-        try { persist('error', fmt(args)); } catch (_) {}
+        if (!isPersisting) {
+            try { persist('error', fmt(args)); } catch (_) {}
+        }
         return origError.apply(console, args);
     };
 

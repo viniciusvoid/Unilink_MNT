@@ -191,15 +191,27 @@ const ChamadosService = {
         const token = sessionData?.session?.access_token;
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const resp = await fetch(`${API_BASE_URL}/chamados/${chamado.idFirebase}/assumir`, {
-            method: 'PATCH',
-            headers
-        });
+        let resp;
+        let baseUrl = API_BASE_URL;
+        try {
+            resp = await fetch(`${baseUrl}/chamados/${chamado.idFirebase}/assumir`, { method: 'PATCH', headers });
+        } catch (e) {
+            throw new Error(`Não foi possível conectar à API (${baseUrl}). Verifique se o serviço API está rodando e se window.API_BASE_URL está correto.`);
+        }
+        // fallback se bateu no front (HTML 404)
+        const ct = resp.headers.get('content-type') || '';
+        if (resp.status === 404 && ct.includes('text/html') && window.API_FALLBACK_URL && baseUrl !== window.API_FALLBACK_URL) {
+            console.warn(`Assumir 404 HTML em ${baseUrl}, tentando fallback ${window.API_FALLBACK_URL}`);
+            resp = await fetch(`${window.API_FALLBACK_URL}/chamados/${chamado.idFirebase}/assumir`, { method: 'PATCH', headers });
+        }
         if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
+            const text = await resp.text().catch(()=> "");
+            let err = {};
+            try { err = JSON.parse(text); } catch {}
+            if (text.includes("<html") || resp.status === 404 && !err.mensagem) throw new Error(`API não encontrada em ${baseUrl}/chamados/.../assumir (404 HTML). Configure window.API_BASE_URL com a URL da API Railway, não do front.`);
             throw new Error(err.mensagem || `Erro ao assumir (${resp.status})`);
         }
-        return resp.json();
+        try { return await resp.json(); } catch { return { ok: true }; }
     },
     // Novo fluxo: concluir (parcial ou total) com observações
     async concluirChamado(chamado, { itensConcluidos, servicoFeito, pendencia, observacoes }) {
@@ -424,14 +436,15 @@ const ApiClient = {
         } catch (_) {}
         return null;
     },
-    async _autenticado(metodo, caminho, corpo, tentouRefresh = false) {
+    async _autenticado(metodo, caminho, corpo, tentouRefresh = false, tentouFallback = false) {
         let token = await this._getValidToken();
         if (!token) {
             throw new Error('Sessão expirada. Faça login novamente.');
         }
         let resp;
+        let baseUrl = API_BASE_URL;
         try {
-            resp = await fetch(`${API_BASE_URL}${caminho}`, {
+            resp = await fetch(`${baseUrl}${caminho}`, {
                 method: metodo,
                 headers: {
                     'Content-Type': 'application/json',
@@ -440,18 +453,42 @@ const ApiClient = {
                 ...(corpo ? { body: JSON.stringify(corpo) } : {})
             });
         } catch (e) {
-            console.error(`Falha de rede ao chamar API ${API_BASE_URL}${caminho}:`, e);
-            throw new Error(`Não foi possível conectar à API (${API_BASE_URL}). Verifique se o servidor está rodando (npm start em /api) e se CORS_ORIGIN inclui ${window.location.origin}.`);
+            console.error(`Falha de rede ao chamar API ${baseUrl}${caminho}:`, e);
+            throw new Error(`Não foi possível conectar à API (${baseUrl}). Verifique se o servidor está rodando (npm start em /api) e se CORS_ORIGIN inclui ${window.location.origin}.`);
+        }
+        // Se a API retornou 404 com HTML (front Caddy, não API), tenta fallback
+        const contentType = resp.headers.get('content-type') || '';
+        const isHtml404 = resp.status === 404 && contentType.includes('text/html');
+        if (isHtml404 && !tentouFallback && window.API_FALLBACK_URL) {
+            console.warn(`API ${baseUrl} retornou HTML 404, tentando fallback ${window.API_FALLBACK_URL}`);
+            try {
+                const fallbackResp = await fetch(`${window.API_FALLBACK_URL}${caminho}`, {
+                    method: metodo,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    ...(corpo ? { body: JSON.stringify(corpo) } : {})
+                });
+                if (fallbackResp.ok) return fallbackResp.json();
+                // se fallback também falhar, lança erro original com dica
+                const fbBody = await fallbackResp.text().catch(()=> "");
+                if (fbBody.includes("<html")) throw new Error(`API não encontrada. Verifique se API_BASE_URL (${baseUrl}) é a URL da API, não do front. Configure window.API_FALLBACK_URL com a URL correta da API.`);
+            } catch (e) {
+                if (e.message.includes('API não encontrada')) throw e;
+            }
+        }
+        if (isHtml404 && !tentouFallback) {
+            throw new Error(`API não encontrada em ${baseUrl}${caminho} (404 HTML). Verifique se API_BASE_URL aponta para o serviço API Railway, não para o front. Defina window.API_BASE_URL no index.html com a URL da API.`);
         }
         if (!resp.ok) {
             const erroBody = await resp.json().catch(() => ({}));
             const msg = erroBody.mensagem || `Erro na API (${resp.status})`;
-            // se for 401 por token expirado e ainda não tentou refresh, tenta uma vez e refaz
             if (resp.status === 401 && !tentouRefresh && msg.includes('Sessão')) {
                 try {
                     const { data: refreshed } = await supabase.auth.refreshSession();
                     if (refreshed?.session?.access_token) {
-                        return this._autenticado(metodo, caminho, corpo, true);
+                        return this._autenticado(metodo, caminho, corpo, true, tentouFallback);
                     }
                 } catch (_) {}
             }

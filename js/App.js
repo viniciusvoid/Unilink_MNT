@@ -32,12 +32,23 @@ function App() {
         return () => unsubscribe();
     }, []);
 
+    const lastSessionIdRef = React.useRef(null);
+    const isFetchingPerfilRef = React.useRef(false);
+    const meuPerfilRef = React.useRef(meuPerfil);
+    React.useEffect(() => { meuPerfilRef.current = meuPerfil; }, [meuPerfil]);
     React.useEffect(() => {
         const aplicarSessao = async (session) => {
+            const sessionId = session?.user?.id || null;
+            // idempotência: evita loop se onAuthStateChange disparar com mesma sessão repetida
+            if (sessionId && lastSessionIdRef.current === sessionId && !session) return;
+            if (isFetchingPerfilRef.current) return;
+            lastSessionIdRef.current = sessionId;
             const isAuth = !!session;
             if (isAuth) setCarregandoAuth(true);
             setAutenticado(isAuth);
             if (isAuth) {
+                if (isFetchingPerfilRef.current) { setCarregandoAuth(false); return; }
+                isFetchingPerfilRef.current = true;
                 try {
                     const perfil = await Promise.race([
                         ChamadosService.obterMeuPerfil(),
@@ -46,11 +57,19 @@ function App() {
                     if (perfil) setMeuPerfil(perfil);
                     else setMeuPerfil({ email: session?.user?.email || 'usuario', papel: 'atendente' });
                 } catch (e) {
-                    console.warn('obterMeuPerfil falhou/timeout, usando fallback', e?.message);
+                    // 404 de /meu-perfil por URL errada não deve travar app — usa fallback e não reloga
+                    if (e.message.includes('(404)') || e.message.includes('API não encontrada')) {
+                        console.warn('obterMeuPerfil 404 — API_BASE_URL provavelmente aponta para front, não API. Usando fallback.', e.message);
+                    } else {
+                        console.warn('obterMeuPerfil falhou/timeout, usando fallback', e?.message);
+                    }
                     setMeuPerfil({ email: session?.user?.email || 'usuario', papel: 'atendente' });
+                } finally {
+                    isFetchingPerfilRef.current = false;
                 }
             } else {
                 setMeuPerfil(null);
+                lastSessionIdRef.current = null;
             }
             setCarregandoAuth(false);
         };
@@ -74,6 +93,8 @@ function App() {
                 });
                 const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
                     if (event === 'PASSWORD_RECOVERY') setTelaAtual('redefinir');
+                    const newId = session?.user?.id || null;
+                    if (event === 'TOKEN_REFRESHED' && newId && lastSessionIdRef.current === newId && meuPerfilRef.current) return;
                     await aplicarSessao(session);
                 });
                 return () => { clearTimeout(timeout); listener?.subscription?.unsubscribe(); };

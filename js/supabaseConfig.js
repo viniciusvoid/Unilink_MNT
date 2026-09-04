@@ -20,11 +20,18 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // 1. Se window.API_BASE_URL estiver definido (via index.html ou Railway env), usa ele
 // 2. Se localhost/127.0.0.1, usa :3001
 // 3. Senão, usa a URL de produção da API (ajuste se seu serviço API tiver outro nome)
+//    IMPORTANTE: https://unilinkmnt-production.up.railway.app é o FRONT (Caddy). A API deve ser outro serviço.
+//    Ex: https://unilinkmnt-api-production.up.railway.app ou https://api-unilinkmnt.up.railway.app
+//    Defina window.API_BASE_URL no index.html ou via Railway Variables para sobrepor.
 const API_BASE_URL = window.API_BASE_URL || (
   window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3001'
     : 'https://unilinkmnt-production.up.railway.app'
 );
-// Fallback automático: se a URL acima for o front (Caddy) e não a API, o ApiClient tentará
-// https://unilinkmnt-production.up.railway.app/health → se 404, tente window.API_FALLBACK_URL
+// Fallback: se o front e a API estiverem no mesmo host com prefixo /api (Vercel), tente também
+// Para Railway com 2 serviços, defina window.API_FALLBACK_URL com a URL da API
 window.API_FALLBACK_URL = window.API_FALLBACK_URL || null;
+// Tentativa automática: se API_BASE_URL for o front e retornar 404 HTML, ApiClient tentará API_FALLBACK_URL
+if (!window.API_FALLBACK_URL && API_BASE_URL.includes('unilinkmnt-production')) {
+  window.API_FALLBACK_URL = API_BASE_URL.replace('unilinkmnt-production', 'unilinkmnt-api-production');
+}
